@@ -46,6 +46,7 @@
             (lambda (a s v b)
               (org-quarto-export-to-qmd-and-render)))))
   :translate-alist '((src-block . org-quarto-src-block)
+                     (link . org-quarto-link)
                      (template . org-quarto-template))
   :options-alist '((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
                    (:quarto-options "QUARTO_OPTIONS" nil nil t)))
@@ -123,6 +124,16 @@ plist holding contextual information."
    "```{" (downcase lang) "}\n"
    (org-export-format-code-default src-block info)
    "```")))
+
+;; Links
+(defun org-quarto-link (link desc info)
+  "Transcode citation LINK to Quarto format. For other types of links,
+default to `org-md-link'."
+  (if (string= "cite" (org-element-property :type link))
+    (concat "\["
+            (replace-regexp-in-string "\\&" "\@" (org-element-property :path link))
+            "\]")
+    (org-md-link link desc info)))
 
 ;; Template
 (defun org-quarto-template (contents info)
