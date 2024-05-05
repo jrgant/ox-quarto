@@ -103,8 +103,6 @@ for `org-md-export-to-markdown' for additional details."
       ":" ": "
       (replace-regexp-in-string " " "\n" (plist-get info :quarto-options)))
      "\n"
-     ;(org-latex--make-option-string
-     ; (plist-get info :quarto-options))
      "---\n\n")))
 
 
