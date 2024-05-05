@@ -47,12 +47,8 @@
               (org-quarto-export-to-qmd-and-render)))))
   :translate-alist '((src-block . org-quarto-src-block)
                      (template . org-quarto-template))
-  ;; TODO 2024-05-04:
-  ;;    - Add support for Quarto options
   :options-alist '((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
-                   (:quarto-options "QUARTO_OPTIONS" nil nil t)
-                   (:quarto-html-options "QUARTO_HTML_OPTIONS" nil nil t)
-                   (:quarto-pdf-options "QUARTO_PDF_OPTIONS" nil nil t)))
+                   (:quarto-options "QUARTO_OPTIONS" nil nil t)))
 
 
 ;;; Interactive functions
