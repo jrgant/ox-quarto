@@ -38,7 +38,13 @@
         (?o "To file and open"
             (lambda (a s v b)
               (if a (org-quarto-export-to-qmd t s v)
-                (org-open-file (org-quarto-export-to-qmd nil s v)))))))
+                (org-open-file (org-quarto-export-to-qmd nil s v)))))
+        (?p "To file and preview"
+            (lambda (a s v b)
+              (org-quarto-export-to-qmd-and-preview)))
+        (?r "To file and render"
+            (lambda (a s v b)
+              (org-quarto-export-to-qmd-and-render)))))
   :translate-alist '((src-block . org-quarto-src-block)
                      (template . org-quarto-template))
   ;; TODO 2024-05-04:
@@ -77,15 +83,18 @@ for `org-md-export-to-markdown'."
     (org-export-to-file 'quarto outfile async subtreep visible-only)))
 
 ;;;###autoload
-;; (defun org-quarto-export-to-qmd-and-preview (plist filename pub-dir)
-;;     "Publish an Org file to Quarto using `quarto preview'. Doing so will
-;; open HTML output from the QMD file in a browser."
-;;     (let ((default-directory (file-name-directory filename)))
-;;       (org-publish-org-to 'quarto filename ".qmd" plist pub-dir)))
+(defun org-quarto-export-to-qmd-and-preview ()
+  "Export the Org file to Quarto and then run `quarto preview'. Doing so will
+open HTML output from the QMD file in a browser."
+  (org-quarto-export-to-qmd)
+  (shell-command (concat "quarto preview " (org-export-output-file-name ".qmd"))))
 
 
 ;;;###autoload
-;(defun org-quarto-export-to-qmd-and-render ())
+(defun org-quarto-export-to-qmd-and-render ()
+  "Export the Org file to Quarto and then run `quarto render'."
+  (org-quarto-export-to-qmd)
+  (shell-command (concat "quarto render " (org-export-output-file-name ".qmd"))))
 
 ;; Generate YAML frontmatter
 (defun org-quarto-yaml-frontmatter (info)
