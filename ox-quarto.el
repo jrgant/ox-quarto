@@ -70,7 +70,7 @@ for `org-md-export-as-markdown'."
 ;;;###autoload
 (defun org-quarto-export-to-qmd (&optional async subtreep visible-only)
   "Export current buffer to a Quarto file. See documentation
-for `org-md-export-to-markdown' for additional details."
+for `org-md-export-to-markdown'."
   (interactive)
   (let ((outfile (org-export-output-file-name ".qmd" subtreep)))
     (org-export-to-file 'quarto outfile async subtreep visible-only)))
