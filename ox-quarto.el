@@ -43,7 +43,8 @@
                      (template . org-quarto-template))
   ;; TODO 2024-05-04:
   ;;    - Add support for Quarto options
-  :options-alist '((:quarto-options "QUARTO_OPTIONS" nil nil t)
+  :options-alist '((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
+                   (:quarto-options "QUARTO_OPTIONS" nil nil t)
                    (:quarto-html-options "QUARTO_HTML_OPTIONS" nil nil t)
                    (:quarto-pdf-options "QUARTO_PDF_OPTIONS" nil nil t)))
 
@@ -89,7 +90,8 @@ for `org-md-export-to-markdown'."
 ;; Generate YAML frontmatter
 (defun org-quarto-yaml-frontmatter (info)
   "Return YAML frontmatter string for Quarto Markdown export."
-  (let ((title (org-export-data (plist-get info :title) info))
+  (let ((quarto_yml (org-export-data (plist-get info :quarto-frontmatter) info))
+        (title (org-export-data (plist-get info :title) info))
         (date (org-export-data (plist-get info :date) info))
         (author (org-export-data (plist-get info :author) info)))
     (concat
@@ -97,6 +99,8 @@ for `org-md-export-to-markdown'."
      (when title (format "title: \"%s\"\n" title))
      (when date (format "date: %s\n" date))
      (when author (format "author: \"%s\"\n" author))
+     "\n"
+     (when quarto_yml (format "%s" (f-read-text quarto_yml)))
      "\n"
      ;; wrangle and format QUARTO_OPTIONS
      (replace-regexp-in-string
