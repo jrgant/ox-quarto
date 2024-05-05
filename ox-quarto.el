@@ -97,6 +97,14 @@ for `org-md-export-to-markdown' for additional details."
      (when title (format "title: \"%s\"\n" title))
      (when date (format "date: %s\n" date))
      (when author (format "author: \"%s\"\n" author))
+     "\n"
+     ;; wrangle and format QUARTO_OPTIONS
+     (replace-regexp-in-string
+      ":" ": "
+      (replace-regexp-in-string " " "\n" (plist-get info :quarto-options)))
+     "\n"
+     ;(org-latex--make-option-string
+     ; (plist-get info :quarto-options))
      "---\n\n")))
 
 
