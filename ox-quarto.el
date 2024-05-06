@@ -103,9 +103,9 @@ open HTML output from the QMD file in a browser."
         (bibliography (org-export-data (plist-get info :bibliography) info)))
     (concat
      "---\n"
-     (when title (format "title: \"%s\"\n" title))
+     (when title (format "title: %s \n" title))
      (when date (format "date: %s\n" date))
-     (when author (format "author: \"%s\"\n" author))
+     (when author (format "author: %s \n" author))
      (when bibliography (format "bibliography: %s \n" bibliography))
      "\n"
      (when quarto_yml (format "%s" (f-read-text quarto_yml)))
