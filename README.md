@@ -9,7 +9,7 @@
 
 At the moment, the exporter prioritizes passing native Quarto markup from an Org file, including YAML frontmatter. After exporting an `.org` file to `.qmd`, [`quarto-cli`](https://github.com/quarto-dev/quarto-cli) handles document creation and is a hard dependency if you want to export directly to formats like HTML and PDF. 
 
-The package is in the early stages of development, and help from folks with more `elisp` than I have is most welcome. (I am a beginner.) Please report bugs and enhancement requests in the [Issues](https://github.com/jrgant/ox-quarto).
+The package is in the early stages of development, and help from folks with more `elisp` than I have is most welcome. (I am a beginner.) Please report bugs and enhancement requests in the [Issues](https://github.com/jrgant/ox-quarto/issues).
 
 
 ## Usage
