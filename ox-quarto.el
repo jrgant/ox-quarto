@@ -45,8 +45,8 @@
         (?r "To file and render"
             (lambda (a s v b)
               (org-quarto-export-to-qmd-and-render)))))
-  :translate-alist '((src-block . org-quarto-src-block)
-                     (link . org-quarto-link)
+  :translate-alist '((link . org-quarto-link)
+                     (src-block . org-quarto-src-block)
                      (template . org-quarto-template))
   :options-alist '((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
                    (:quarto-options "QUARTO_OPTIONS" nil nil t)))
