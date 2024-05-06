@@ -53,3 +53,14 @@ hist(rnorm(100))
 #+END_SRC
 ```
 
+
+### Keybindings
+
+| Binding       | Export                                      |
+|:--------------|:--------------------------------------------|
+| `C-c C-e Q b` | To temporary buffer                         |
+| `C-c C-e Q o` | To file and open                            |
+| `C-c C-e Q f` | To file                                     |
+| `C-c C-e Q p` | To file and preview (runs `quarto preview`) |
+| `C-c C-e Q r` | To file and render (runs `quarto render`)   |
+
