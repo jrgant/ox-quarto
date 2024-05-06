@@ -65,3 +65,7 @@ I've not yet made an effort to parse output from `org-babel` computations, which
 | `C-c C-e Q p` | To file and preview (runs `quarto preview`) |
 | `C-c C-e Q r` | To file and render (runs `quarto render`)   |
 
+
+## Testing
+
+Over time I will try to add tests to the repository. Until then, I am doing ad hoc tests on Kubuntu 22.04. Please report Windows or Mac-specific issues.
