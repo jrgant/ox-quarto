@@ -32,7 +32,7 @@ For selfish reasons, `ox-quarto` looks for [`org-ref`](https://github.com/jkitch
 
 In the future, I hope to add support for parsing special blocks in Org, but for the moment, you should be able to pass native Quarto markup directly into the `.qmd` document.
 
-For the most part, you should be able to write Quarto markup directly in the Org buffer. In some cases, `ox-md` will insert escape characters that cause inconsistencies in rendered content. You should consider using a `markdown` source block when you run into problems.
+For the most part, Quarto markup written in the main body of the Org buffer should render correctly. In some cases, `ox-md` will insert escape characters that cause inconsistencies in rendered content. You should consider using a `markdown` source block when you run into problems.
 
 ```org
 #+BEGIN_SRC markdown
@@ -60,8 +60,8 @@ I've not yet made an effort to parse output from `org-babel` computations, which
 | Binding       | Export                                      |
 |:--------------|:--------------------------------------------|
 | `C-c C-e Q b` | To temporary buffer                         |
-| `C-c C-e Q o` | To file and open                            |
 | `C-c C-e Q f` | To file                                     |
+| `C-c C-e Q o` | To file and open                            |
 | `C-c C-e Q p` | To file and preview (runs `quarto preview`) |
 | `C-c C-e Q r` | To file and render (runs `quarto render`)   |
 
