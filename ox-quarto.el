@@ -65,8 +65,8 @@ this command to convert it."
 
 ;;;###autoload
 (defun org-quarto-export-as-qmd (&optional async subtreep visible-only)
-  "Export current buffer to a Quarto Markdown buffer. See documentation
-for `org-md-export-as-markdown'."
+  "Export current buffer to a Quarto Markdown buffer.
+See documentation for `org-md-export-as-markdown'."
   (interactive)
   (org-export-to-buffer 'quarto "*Org Quarto Export*"
     async subtreep visible-only nil nil (lambda () (text-mode))))
@@ -129,8 +129,9 @@ plist holding contextual information."
 
 ;; Links
 (defun org-quarto-link (link desc info)
-  "Transcode citation LINK to Quarto format. For other types of links,
-default to `org-md-link'."
+  "Transcode org-ref citation LINK and DESC to Quarto format.
+For other types of links, default to `org-md-link'. INFO is a plist used as a
+communication channel."
   (if (string= "cite" (org-element-property :type link))
     (concat "\["
             (replace-regexp-in-string "\\&" "\@" (org-element-property :path link))
@@ -139,7 +140,9 @@ default to `org-md-link'."
 
 ;; Template
 (defun org-quarto-template (contents info)
-  "Return complete document string after Quarto Markdown conversion."
+  "Return complete document string after Quarto Markdown conversion.
+This function concatenates the YAML frontmatter and the document CONTENTS. INFO
+is a plist used as a communication channel."
   ;; Build up YAML frontmatter
   (concat
    (org-quarto-yaml-frontmatter info)
