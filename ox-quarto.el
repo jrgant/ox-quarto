@@ -99,12 +99,14 @@ open HTML output from the QMD file in a browser."
   (let ((quarto_yml (org-export-data (plist-get info :quarto-frontmatter) info))
         (title (org-export-data (plist-get info :title) info))
         (date (org-export-data (plist-get info :date) info))
-        (author (org-export-data (plist-get info :author) info)))
+        (author (org-export-data (plist-get info :author) info))
+        (bibliography (org-export-data (plist-get info :bibliography) info)))
     (concat
      "---\n"
      (when title (format "title: \"%s\"\n" title))
      (when date (format "date: %s\n" date))
      (when author (format "author: \"%s\"\n" author))
+     (when bibliography (format "bibliography: %s \n" bibliography))
      "\n"
      (when quarto_yml (format "%s" (f-read-text quarto_yml)))
      "\n"

@@ -16,7 +16,7 @@ The package is in the early stages of development, and help from folks with more
 
 ### Document options
 
-For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of contents directly in the `.qmd` document. `ox-quarto` will use Org's `TITLE`, `AUTHOR`, and `DATE` fields, if available.
+For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of contents directly in the `.qmd` document. `ox-quarto` will use Org's `TITLE`, `AUTHOR`, `DATE`, and `BIBLIOGRAPHY` fields, if available.
 
 - `#+QUARTO_OPTIONS` :: Limited to a single line, pass elements to Quarto's YAML frontmatter (ex., `toc:true toc-depth:2`). These will be inserted after the title, author, and date (when these elements are specified within the Org fields).
 
