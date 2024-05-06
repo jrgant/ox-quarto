@@ -53,6 +53,7 @@ hist(rnorm(100))
 #+END_SRC
 ```
 
+I've not yet made an effort to parse output from `org-babel` computations, which means that code chunk options are the primary means to format figures, tables, and other output. At some point I hope to add parsing of Org captions and labels.
 
 ### Keybindings
 
