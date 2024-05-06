@@ -22,7 +22,7 @@ For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of co
 
 - `#+QUARTO_FRONTMATTER` :: The name of a file containing YAML frontmatter content. This file will be inserted as is into the `.qmd` file's frontmatter block.
 
-`ox-quarto` does not check for duplicate keys in the frontmatter, so if use Org's `DATE` field and set `date` again in `QUARTO_OPTIONS` or your `QUARTO_FRONTMATTER` file, you will get a compilation error from `quarto-cli`.
+`ox-quarto` does not check for duplicate keys in the frontmatter, so if you use Org's `DATE` field and set `date` again in `QUARTO_OPTIONS` or your `QUARTO_FRONTMATTER` file, you will get a compilation error from `quarto-cli`.
 
 ### Citations
 
