@@ -86,14 +86,15 @@ open HTML output from the QMD file in a browser."
   (org-quarto-export-to-qmd)
   (shell-command (concat "quarto preview " (org-export-output-file-name ".qmd"))))
 
-
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-render ()
   "Export the Org file to Quarto and then run `quarto render'."
   (org-quarto-export-to-qmd)
   (shell-command (concat "quarto render " (org-export-output-file-name ".qmd"))))
 
+
 ;; Generate YAML frontmatter
+
 (defun org-quarto-yaml-frontmatter (info)
   "Return YAML frontmatter string for Quarto Markdown export."
   (let ((quarto_yml (org-export-data (plist-get info :quarto-frontmatter) info))
@@ -118,16 +119,19 @@ open HTML output from the QMD file in a browser."
 
 
 ;; Source Blocks
+
 (defun org-quarto-src-block (src-block _contents info)
-  "Transcode a SRC-BLOCK element from Org to Quarto Markdown. INFO is a
-plist holding contextual information."
+  "Transcode a SRC-BLOCK element from Org to Quarto Markdown.
+INFO is a plist holding contextual information."
   (let ((lang (org-element-property :language src-block)))
   (concat
    "```{" (downcase lang) "}\n"
    (org-export-format-code-default src-block info)
    "```")))
 
+
 ;; Links
+
 (defun org-quarto-link (link desc info)
   "Transcode org-ref citation LINK and DESC to Quarto format.
 For other types of links, default to `org-md-link'. INFO is a plist used as a
@@ -138,7 +142,9 @@ communication channel."
             "\]")
     (org-md-link link desc info)))
 
+
 ;; Template
+;;
 (defun org-quarto-template (contents info)
   "Return complete document string after Quarto Markdown conversion.
 This function concatenates the YAML frontmatter and the document CONTENTS. INFO
