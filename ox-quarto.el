@@ -96,20 +96,27 @@ open HTML output from the QMD file in a browser."
 ;; Generate YAML frontmatter
 
 (defun org-quarto-yaml-frontmatter (info)
-  "Return YAML frontmatter string for Quarto Markdown export."
-  (let ((quarto_yml (org-export-data (plist-get info :quarto-frontmatter) info))
-        (title (org-export-data (plist-get info :title) info))
-        (date (org-export-data (plist-get info :date) info))
-        (author (org-export-data (plist-get info :author) info))
-        (bibliography (org-export-data (plist-get info :bibliography) info)))
+  "Return YAML frontmatter string from INFO for Quarto Markdown export."
+  (let ((title (plist-get info :title))
+        (date (plist-get info :date))
+        (author (plist-get info :author))
+        (bibliography (plist-get info :bibliography))
+        (quarto_yml (plist-get info :quarto-frontmatter)))
     (concat
      "---\n"
-     (when title (format "title: %s \n" title))
-     (when date (format "date: %s\n" date))
-     (when author (format "author: %s \n" author))
-     (when bibliography (format "bibliography: %s \n" bibliography))
-     "\n"
-     (when quarto_yml (format "%s" (f-read-text quarto_yml)))
+     (when (and title
+                (plist-get info :with-title))
+       (format "title: %s\n" (org-export-data title info)))
+     (when (and date
+                (plist-get info :with-date))
+       (format "date: %s\n" (org-export-data date info)))
+     (when (and author
+                (plist-get info :with-author))
+       (format "author: %s\n" (org-export-data author info)))
+     (when bibliography
+       (format "bibliography: %s\n" (org-export-data bibliography info)))
+     (when quarto_yml
+       (format "%s" (f-read-text (org-export-data quarto_yml info))))
      "\n"
      ;; wrangle and format QUARTO_OPTIONS
      (replace-regexp-in-string
