@@ -85,7 +85,9 @@ for `org-md-export-to-markdown'."
   "Export the Org file to Quarto and then run `quarto preview'. Doing so will
 open HTML output from the QMD file in a browser."
   (org-quarto-export-to-qmd)
-  (shell-command (concat "quarto preview " (org-export-output-file-name ".qmd"))))
+  (shell-command (concat "quarto preview "
+                         (org-export-output-file-name ".qmd ")
+                         (org-entry-get nil "QUARTO_PREVIEW_ARGS"))))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-render ()
