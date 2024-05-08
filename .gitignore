@@ -1,3 +1,11 @@
 examples/
 testfile*
 *.yml
+Makefile
+*.docx
+*.html
+*.pdf
+*.bbl
+*.bib
+*.tex
+*.auctex-auto/
