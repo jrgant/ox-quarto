@@ -104,7 +104,8 @@ open HTML output from the QMD file in a browser."
         (date (plist-get info :date))
         (author (plist-get info :author))
         (bibliography (plist-get info :bibliography))
-        (quarto_yml (plist-get info :quarto-frontmatter)))
+        (quarto_yml (plist-get info :quarto-frontmatter))
+        (quarto_opts (plist-get info :quarto-options)))
     (concat
      "---\n"
      (when (and title
@@ -119,13 +120,13 @@ open HTML output from the QMD file in a browser."
      (when bibliography
        (format "bibliography: %s\n" (org-export-data bibliography info)))
      (when quarto_yml
-       (format "%s" (f-read-text (org-export-data quarto_yml info))))
-     "\n"
+       (format "%s\n" (f-read-text (org-export-data quarto_yml info))))
      ;; wrangle and format QUARTO_OPTIONS
-     (replace-regexp-in-string
-      ":" ": "
-      (replace-regexp-in-string " " "\n" (plist-get info :quarto-options)))
-     "\n---\n")))
+     (when quarto_opts
+       (replace-regexp-in-string
+        ":" ": "
+        (replace-regexp-in-string " " "\n" (plist-get info :quarto-options))))
+     "---\n")))
 
 
 ;; Source Blocks
