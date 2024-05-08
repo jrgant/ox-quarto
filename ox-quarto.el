@@ -151,7 +151,7 @@ communication channel."
 
 
 ;; Template
-;;
+
 (defun org-quarto-template (contents info)
   "Return complete document string after Quarto Markdown conversion.
 This function concatenates the YAML frontmatter and the document CONTENTS. INFO
