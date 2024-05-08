@@ -46,6 +46,7 @@
             (lambda (a s v b)
               (org-quarto-export-to-qmd-and-render)))))
   :translate-alist '((link . org-quarto-link)
+                     (plain-text . org-quarto-plain-text)
                      (src-block . org-quarto-src-block)
                      (template . org-quarto-template))
   :options-alist '((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
@@ -148,6 +149,33 @@ communication channel."
             (replace-regexp-in-string "\\&" "\@" (org-element-property :path link))
             "\]")
     (org-md-link link desc info)))
+
+
+;; Plain text
+
+(defun org-quarto-plain-text (text info)
+  "Transcode a TEXT string into Markdown format.
+TEXT is the string to transcode.  INFO is a plist holding
+contextual information. This function is copied from `org-md-plain-text'
+and simply removes the activation of smart-quote export."
+  ;; The below series of replacements in `text' is order sensitive.
+  ;; Protect `, *, _, and \
+  (setq text (replace-regexp-in-string "[`*_\\]" "\\\\\\&" text))
+  ;; Protect ambiguous #.  This will protect # at the beginning of
+  ;; a line, but not at the beginning of a paragraph.  See
+  ;; `org-md-paragraph'.
+  (setq text (replace-regexp-in-string "\n#" "\n\\\\#" text))
+  ;; Protect ambiguous !
+  (setq text (replace-regexp-in-string "\\(!\\)\\[" "\\\\!" text nil nil 1))
+  ;; Handle special strings, if required.
+  (when (plist-get info :with-special-strings)
+    (setq text (org-html-convert-special-strings text)))
+  ;; Handle break preservation, if required.
+  (when (plist-get info :preserve-breaks)
+    (setq text (replace-regexp-in-string "[ \t]*\n" "  \n" text)))
+  ;; Return value.
+  text)
+
 
 
 ;; Template
