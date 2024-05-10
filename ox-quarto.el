@@ -126,7 +126,7 @@ open HTML output from the QMD file in a browser."
        (replace-regexp-in-string
         ":" ": "
         (replace-regexp-in-string " " "\n" (plist-get info :quarto-options))))
-     "---\n")))
+     "\n---\n")))
 
 
 ;; Source Blocks
