@@ -74,16 +74,16 @@ See documentation for `org-md-export-as-markdown'."
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd (&optional async subtreep visible-only)
-  "Export current buffer to a Quarto file. See documentation
-for `org-md-export-to-markdown'."
+  "Export current buffer to a Quarto file.
+See documentation for `org-md-export-to-markdown'."
   (interactive)
   (let ((outfile (org-export-output-file-name ".qmd" subtreep)))
     (org-export-to-file 'quarto outfile async subtreep visible-only)))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-preview ()
-  "Export the Org file to Quarto and then run `quarto preview'. Doing so will
-open HTML output from the QMD file in a browser."
+  "Export the Org file to Quarto and then run `quarto preview'.
+Doing so will open HTML output from the QMD file in a browser."
   (org-quarto-export-to-qmd)
   (shell-command (concat "quarto preview "
                          (org-export-output-file-name ".qmd ")
