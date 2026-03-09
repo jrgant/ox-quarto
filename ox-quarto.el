@@ -28,6 +28,7 @@
 (require 'ox-md)
 (require 'ox-publish)
 (require 'table)
+(require 'oc)
 
 
 ;;; Define Back-End
@@ -240,6 +241,38 @@ and simply removes the activation of smart-quote export."
   ;; Return value.
   text)
 
+
+
+;; Citations
+
+(defun org-quarto--citation-export (citation style _backend info)
+  "Export CITATION object to Quarto format.
+STYLE is the citation style.  INFO is the export state."
+  (let* ((common-prefix (org-export-data (org-element-property :prefix citation) info))
+         (common-suffix (org-export-data (org-element-property :suffix citation) info))
+         (style-name (and style (car style)))
+         (suppress-author (string= style-name "na"))
+         (text-cite (string= style-name "t"))
+         (refs (mapconcat (lambda (ref)
+                            (let ((key (org-element-property :key ref))
+                                  (prefix (org-export-data (org-element-property :prefix ref) info))
+                                  (suffix (org-export-data (org-element-property :suffix ref) info)))
+                              (concat prefix 
+                                      (if suppress-author "-@" "@") 
+                                      key 
+                                      (if (and text-cite (org-string-nw-p suffix))
+                                          (concat " [" suffix "]")
+                                        suffix))))
+                          (org-element-contents citation)
+                          (if text-cite ", " "; "))))
+    (if text-cite
+        (concat common-prefix refs common-suffix)
+      (concat "[" common-prefix refs common-suffix "]"))))
+
+(org-cite-register-processor 'quarto
+  :export-citation #'org-quarto--citation-export)
+
+(add-to-list 'org-cite-export-processors '(quarto . (quarto)))
 
 
 ;; Template
