@@ -210,9 +210,14 @@ INFO is a plist holding contextual information."
 For other types of links, default to `org-md-link'. INFO is a plist used as a
 communication channel."
   (if (string= "cite" (org-element-property :type link))
-    (concat "\["
-            (replace-regexp-in-string "\\&" "\@" (org-element-property :path link))
-            "\]")
+      (let* ((path (org-element-property :path link))
+             (clean-path (replace-regexp-in-string "\\&" "" path))
+             (keys (split-string clean-path ",")))
+        (concat "["
+                (mapconcat (lambda (k)
+                             (concat "@" (replace-regexp-in-string "^@" "" k)))
+                           keys "; ")
+                "]"))
     (org-md-link link desc info)))
 
 
