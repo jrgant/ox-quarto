@@ -189,10 +189,10 @@ Doing so will open HTML output from the QMD file in a browser, explicitly settin
   "Transcode a SRC-BLOCK element from Org to Quarto Markdown.
 INFO is a plist holding contextual information."
   (let ((lang (org-element-property :language src-block)))
-  (concat
-   "```{" (downcase lang) "}\n"
-   (org-export-format-code-default src-block info)
-   "```")))
+   (concat
+    "```{" (downcase lang) "}\n"
+    (org-export-format-code-default src-block info)
+    "```")))
 
 
 ;; Links
