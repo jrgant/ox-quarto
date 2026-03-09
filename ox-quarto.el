@@ -172,15 +172,18 @@ Doing so will open HTML output from the QMD file in a browser, explicitly settin
                 (plist-get info :with-author))
        (format "author: %s\n" (org-export-data author info)))
      (when bibliography
-       (format "bibliography: %s\n" (org-export-data bibliography info)))
+       (let ((bibs (split-string (if (stringp bibliography) bibliography (org-export-data bibliography info)) "[ \t\n]+" t)))
+         (if (= (length bibs) 1)
+             (format "bibliography: %s\n" (car bibs))
+           (concat "bibliography:\n"
+                   (mapconcat (lambda (b) (format "  - %s" b)) bibs "\n")
+                   "\n"))))
      (when quarto_yml
-       (format "%s\n" (f-read-text (org-export-data quarto_yml info))))
-     ;; wrangle and format QUARTO_OPTIONS
+       (format "%s\n" (org-quarto--read-file-contents (org-export-data quarto_yml info))))
+     ;; Wrangle and format QUARTO_OPTIONS
      (when quarto_opts
-       (replace-regexp-in-string
-        ":" ": "
-        (replace-regexp-in-string " " "\n" (plist-get info :quarto-options))))
-     "\n---\n")))
+       (concat (org-quarto--wrangle-options quarto_opts) "\n"))
+     "---\n\n")))
 
 
 ;; Source Blocks
