@@ -1,6 +1,6 @@
 ;; ox-quarto.el --- Quarto Backend for Org Export Engine -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2024 Jason Gantenberg
+;; Copyright (C) 2026 Jason Gantenberg
 ;; Author: Jason Gantenberg <jason.gantenberg@gmail.com>
 ;; Keywords: org, export, quarto
 
@@ -23,8 +23,13 @@
 (org-assert-version)
 
 (require 'cl-lib)
+(require 'format-spec)
+(require 'ox)
 (require 'ox-md)
 (require 'ox-publish)
+(require 'table)
+(require 'oc)
+
 
 ;;; Define Back-End
 
@@ -41,16 +46,22 @@
                 (org-open-file (org-quarto-export-to-qmd nil s v)))))
         (?p "To file and preview"
             (lambda (a s v b)
-              (org-quarto-export-to-qmd-and-preview)))
+              (org-quarto-export-to-qmd-and-preview a s v)))
+        (?h "To HTML and preview"
+            (lambda (a s v b)
+              (org-quarto-export-to-qmd-and-preview-html a s v)))
         (?r "To file and render"
             (lambda (a s v b)
-              (org-quarto-export-to-qmd-and-render)))))
+              (org-quarto-export-to-qmd-and-render a s v)))))
   :translate-alist '((link . org-quarto-link)
                      (plain-text . org-quarto-plain-text)
                      (src-block . org-quarto-src-block)
                      (template . org-quarto-template))
-  :options-alist '((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
-                   (:quarto-options "QUARTO_OPTIONS" nil nil t)))
+  :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
+                   (:quarto-options "QUARTO_OPTIONS" nil nil space)
+                   (:quarto-preview-args "QUARTO_PREVIEW_ARGS" nil nil space)
+                   (:quarto-render-args "QUARTO_RENDER_ARGS" nil nil space)
+                   (:bibliography "BIBLIOGRAPHY" nil nil space)))
 
 
 ;;; Interactive functions
@@ -74,33 +85,78 @@ See documentation for `org-md-export-as-markdown'."
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd (&optional async subtreep visible-only)
-  "Export current buffer to a Quarto file. See documentation
-for `org-md-export-to-markdown'."
+  "Export current buffer to a Quarto file.
+See documentation for `org-md-export-to-markdown'."
   (interactive)
   (let ((outfile (org-export-output-file-name ".qmd" subtreep)))
     (org-export-to-file 'quarto outfile async subtreep visible-only)))
 
 ;;;###autoload
-(defun org-quarto-export-to-qmd-and-preview ()
-  "Export the Org file to Quarto and then run `quarto preview'. Doing so will
-open HTML output from the QMD file in a browser."
-  (org-quarto-export-to-qmd)
-  (shell-command (concat "quarto preview "
-                         (org-export-output-file-name ".qmd ")
-                         (org-entry-get nil "QUARTO_PREVIEW_ARGS"))))
+(defun org-quarto-export-to-qmd-and-preview (&optional async subtreep visible-only)
+  "Export the Org file to Quarto and then run `quarto preview'.
+Doing so will open HTML output from the QMD file in a browser."
+  (interactive)
+  (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
+         (info (org-export-get-environment 'quarto))
+         (args (plist-get info :quarto-preview-args))
+         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
+         (process-args (append (list "preview" (expand-file-name outfile)) args-list)))
+    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
+    (apply #'start-process "quarto-preview" "*quarto-preview*" "quarto" process-args)
+    (display-buffer "*quarto-preview*")))
 
 ;;;###autoload
-(defun org-quarto-export-to-qmd-and-render ()
+(defun org-quarto-export-to-qmd-and-preview-html (&optional async subtreep visible-only)
+  "Export the Org file to Quarto and then run `quarto preview --to html'.
+Doing so will open HTML output from the QMD file in a browser, explicitly setting the target format."
+  (interactive)
+  (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
+         (info (org-export-get-environment 'quarto))
+         (args (plist-get info :quarto-preview-args))
+         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
+         (process-args (append (list "preview" (expand-file-name outfile) "--to" "html") args-list)))
+    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
+    (apply #'start-process "quarto-preview" "*quarto-preview*" "quarto" process-args)
+    (display-buffer "*quarto-preview*")))
+
+;;;###autoload
+(defun org-quarto-export-to-qmd-and-render (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto render'."
-  (org-quarto-export-to-qmd)
-  (shell-command (concat "quarto render " (org-export-output-file-name ".qmd"))))
+  (interactive)
+  (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
+         (info (org-export-get-environment 'quarto))
+         (args (plist-get info :quarto-render-args))
+         (args-str (if (stringp args) (concat " " args) "")))
+    (compile (concat "quarto render " (shell-quote-argument (expand-file-name outfile)) args-str))))
 
 
 ;; Generate YAML frontmatter
+(defun org-quarto--wrangle-options (opts-str)
+  "Parse a string of space-separated KEY:VALUE pairs into a YAML block."
+  (if (not (and opts-str (stringp opts-str)))
+      ""
+    (let* ((opts-list (split-string opts-str "[ \t\n]+" t))
+           (result-lines '())
+           (current-pair nil))
+      (while opts-list
+        (setq current-pair (pop opts-list))
+        (if (stringp current-pair)
+            (let ((parts (split-string current-pair ":" t)))
+              (if (cdr parts)
+                  (push (concat (car parts) ": " (cadr parts)) result-lines)
+                (push current-pair result-lines)))))
+      (mapconcat 'identity (nreverse result-lines) "\n"))))
+
+(defun org-quarto--read-file-contents (filename)
+  "Read the contents of FILENAME and return them as a string."
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (buffer-string)))
 
 (defun org-quarto-yaml-frontmatter (info)
   "Return YAML frontmatter string from INFO for Quarto Markdown export."
   (let ((title (plist-get info :title))
+        (subtitle (plist-get info :subtitle))
         (date (plist-get info :date))
         (author (plist-get info :author))
         (bibliography (plist-get info :bibliography))
@@ -111,6 +167,9 @@ open HTML output from the QMD file in a browser."
      (when (and title
                 (plist-get info :with-title))
        (format "title: %s\n" (org-export-data title info)))
+     (when (and subtitle
+                (plist-get info :with-title))
+       (format "subtitle: %s\n" (org-export-data subtitle info)))
      (when (and date
                 (plist-get info :with-date))
        (format "date: %s\n" (org-export-data date info)))
@@ -118,15 +177,18 @@ open HTML output from the QMD file in a browser."
                 (plist-get info :with-author))
        (format "author: %s\n" (org-export-data author info)))
      (when bibliography
-       (format "bibliography: %s\n" (org-export-data bibliography info)))
+       (let ((bibs (split-string (if (stringp bibliography) bibliography (org-export-data bibliography info)) "[ \t\n]+" t)))
+         (if (= (length bibs) 1)
+             (format "bibliography: %s\n" (car bibs))
+           (concat "bibliography:\n"
+                   (mapconcat (lambda (b) (format "  - %s" b)) bibs "\n")
+                   "\n"))))
      (when quarto_yml
-       (format "%s\n" (f-read-text (org-export-data quarto_yml info))))
-     ;; wrangle and format QUARTO_OPTIONS
+       (format "%s\n" (org-quarto--read-file-contents (org-export-data quarto_yml info))))
+     ;; Wrangle and format QUARTO_OPTIONS
      (when quarto_opts
-       (replace-regexp-in-string
-        ":" ": "
-        (replace-regexp-in-string " " "\n" (plist-get info :quarto-options))))
-     "---\n")))
+       (concat (org-quarto--wrangle-options quarto_opts) "\n"))
+     "---\n\n")))
 
 
 ;; Source Blocks
@@ -135,10 +197,10 @@ open HTML output from the QMD file in a browser."
   "Transcode a SRC-BLOCK element from Org to Quarto Markdown.
 INFO is a plist holding contextual information."
   (let ((lang (org-element-property :language src-block)))
-  (concat
-   "```{" (downcase lang) "}\n"
-   (org-export-format-code-default src-block info)
-   "```")))
+   (concat
+    "```{" (downcase lang) "}\n"
+    (org-export-format-code-default src-block info)
+    "```")))
 
 
 ;; Links
@@ -148,9 +210,14 @@ INFO is a plist holding contextual information."
 For other types of links, default to `org-md-link'. INFO is a plist used as a
 communication channel."
   (if (string= "cite" (org-element-property :type link))
-    (concat "\["
-            (replace-regexp-in-string "\\&" "\@" (org-element-property :path link))
-            "\]")
+      (let* ((path (org-element-property :path link))
+             (clean-path (replace-regexp-in-string "\\&" "" path))
+             (keys (split-string clean-path ",")))
+        (concat "["
+                (mapconcat (lambda (k)
+                             (concat "@" (replace-regexp-in-string "^@" "" k)))
+                           keys "; ")
+                "]"))
     (org-md-link link desc info)))
 
 
@@ -181,6 +248,38 @@ and simply removes the activation of smart-quote export."
 
 
 
+;; Citations
+
+(defun org-quarto--citation-export (citation style _backend info)
+  "Export CITATION object to Quarto format.
+STYLE is the citation style.  INFO is the export state."
+  (let* ((common-prefix (org-export-data (org-element-property :prefix citation) info))
+         (common-suffix (org-export-data (org-element-property :suffix citation) info))
+         (style-name (and style (car style)))
+         (suppress-author (string= style-name "na"))
+         (text-cite (string= style-name "t"))
+         (refs (mapconcat (lambda (ref)
+                            (let ((key (org-element-property :key ref))
+                                  (prefix (org-export-data (org-element-property :prefix ref) info))
+                                  (suffix (org-export-data (org-element-property :suffix ref) info)))
+                              (concat prefix 
+                                      (if suppress-author "-@" "@") 
+                                      key 
+                                      (if (and text-cite (org-string-nw-p suffix))
+                                          (concat " [" suffix "]")
+                                        suffix))))
+                          (org-element-contents citation)
+                          (if text-cite ", " "; "))))
+    (if text-cite
+        (concat common-prefix refs common-suffix)
+      (concat "[" common-prefix refs common-suffix "]"))))
+
+(org-cite-register-processor 'quarto
+  :export-citation #'org-quarto--citation-export)
+
+(add-to-list 'org-cite-export-processors '(quarto . (quarto)))
+
+
 ;; Template
 
 (defun org-quarto-template (contents info)
@@ -196,5 +295,6 @@ is a plist used as a communication channel."
 
 ;;; Local variables:
 ;;; generated-autoload-file: "ox-loaddefs.el"
+;;; End:
 
 ;;; ox-quarto.el ends here
