@@ -59,6 +59,7 @@
   :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
                    (:quarto-options "QUARTO_OPTIONS" nil nil space)
                    (:quarto-preview-args "QUARTO_PREVIEW_ARGS" nil nil space)
+                   (:quarto-render-args "QUARTO_RENDER_ARGS" nil nil space)
                    (:bibliography "BIBLIOGRAPHY" nil nil space)))
 
 
@@ -121,8 +122,11 @@ Doing so will open HTML output from the QMD file in a browser, explicitly settin
 (defun org-quarto-export-to-qmd-and-render (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto render'."
   (interactive)
-  (let ((outfile (org-quarto-export-to-qmd async subtreep visible-only)))
-    (compile (concat "quarto render " (shell-quote-argument (expand-file-name outfile))))))
+  (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
+         (info (org-export-get-environment 'quarto))
+         (args (plist-get info :quarto-render-args))
+         (args-str (if (stringp args) (concat " " args) "")))
+    (compile (concat "quarto render " (shell-quote-argument (expand-file-name outfile)) args-str))))
 
 
 ;; Generate YAML frontmatter
