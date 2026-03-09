@@ -1,6 +1,6 @@
 ;; ox-quarto.el --- Quarto Backend for Org Export Engine -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2024 Jason Gantenberg
+;; Copyright (C) 2026 Jason Gantenberg
 ;; Author: Jason Gantenberg <jason.gantenberg@gmail.com>
 ;; Keywords: org, export, quarto
 
