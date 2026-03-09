@@ -23,8 +23,12 @@
 (org-assert-version)
 
 (require 'cl-lib)
+(require 'format-spec)
+(require 'ox)
 (require 'ox-md)
 (require 'ox-publish)
+(require 'table)
+
 
 ;;; Define Back-End
 
@@ -49,8 +53,8 @@
                      (plain-text . org-quarto-plain-text)
                      (src-block . org-quarto-src-block)
                      (template . org-quarto-template))
-  :options-alist '((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
-                   (:quarto-options "QUARTO_OPTIONS" nil nil t)))
+  :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
+                   (:quarto-options "QUARTO_OPTIONS" nil nil space)))
 
 
 ;;; Interactive functions
@@ -97,10 +101,32 @@ Doing so will open HTML output from the QMD file in a browser."
 
 
 ;; Generate YAML frontmatter
+(defun org-quarto--wrangle-options (opts-str)
+  "Parse a string of space-separated KEY:VALUE pairs into a YAML block."
+  (if (not (and opts-str (stringp opts-str)))
+      ""
+    (let* ((opts-list (split-string opts-str "[ \t\n]+" t))
+           (result-lines '())
+           (current-pair nil))
+      (while opts-list
+        (setq current-pair (pop opts-list))
+        (if (stringp current-pair)
+            (let ((parts (split-string current-pair ":" t)))
+              (if (cdr parts)
+                  (push (concat (car parts) ": " (cadr parts)) result-lines)
+                (push current-pair result-lines)))))
+      (mapconcat 'identity (nreverse result-lines) "\n"))))
+
+(defun org-quarto--read-file-contents (filename)
+  "Read the contents of FILENAME and return them as a string."
+  (with-temp-buffer
+    (insert-file-contents filename)
+    (buffer-string)))
 
 (defun org-quarto-yaml-frontmatter (info)
   "Return YAML frontmatter string from INFO for Quarto Markdown export."
   (let ((title (plist-get info :title))
+        (subtitle (plist-get info :subtitle))
         (date (plist-get info :date))
         (author (plist-get info :author))
         (bibliography (plist-get info :bibliography))
@@ -196,5 +222,6 @@ is a plist used as a communication channel."
 
 ;;; Local variables:
 ;;; generated-autoload-file: "ox-loaddefs.el"
+;;; End:
 
 ;;; ox-quarto.el ends here
