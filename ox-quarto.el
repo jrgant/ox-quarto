@@ -45,16 +45,21 @@
                 (org-open-file (org-quarto-export-to-qmd nil s v)))))
         (?p "To file and preview"
             (lambda (a s v b)
-              (org-quarto-export-to-qmd-and-preview)))
+              (org-quarto-export-to-qmd-and-preview a s v)))
+        (?h "To HTML and preview"
+            (lambda (a s v b)
+              (org-quarto-export-to-qmd-and-preview-html a s v)))
         (?r "To file and render"
             (lambda (a s v b)
-              (org-quarto-export-to-qmd-and-render)))))
+              (org-quarto-export-to-qmd-and-render a s v)))))
   :translate-alist '((link . org-quarto-link)
                      (plain-text . org-quarto-plain-text)
                      (src-block . org-quarto-src-block)
                      (template . org-quarto-template))
   :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
-                   (:quarto-options "QUARTO_OPTIONS" nil nil space)))
+                   (:quarto-options "QUARTO_OPTIONS" nil nil space)
+                   (:quarto-preview-args "QUARTO_PREVIEW_ARGS" nil nil space)
+                   (:bibliography "BIBLIOGRAPHY" nil nil space)))
 
 
 ;;; Interactive functions
@@ -85,19 +90,39 @@ See documentation for `org-md-export-to-markdown'."
     (org-export-to-file 'quarto outfile async subtreep visible-only)))
 
 ;;;###autoload
-(defun org-quarto-export-to-qmd-and-preview ()
+(defun org-quarto-export-to-qmd-and-preview (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto preview'.
 Doing so will open HTML output from the QMD file in a browser."
-  (org-quarto-export-to-qmd)
-  (shell-command (concat "quarto preview "
-                         (org-export-output-file-name ".qmd ")
-                         (org-entry-get nil "QUARTO_PREVIEW_ARGS"))))
+  (interactive)
+  (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
+         (info (org-export-get-environment 'quarto))
+         (args (plist-get info :quarto-preview-args))
+         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
+         (process-args (append (list "preview" (expand-file-name outfile)) args-list)))
+    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
+    (apply #'start-process "quarto-preview" "*quarto-preview*" "quarto" process-args)
+    (display-buffer "*quarto-preview*")))
 
 ;;;###autoload
-(defun org-quarto-export-to-qmd-and-render ()
+(defun org-quarto-export-to-qmd-and-preview-html (&optional async subtreep visible-only)
+  "Export the Org file to Quarto and then run `quarto preview --to html'.
+Doing so will open HTML output from the QMD file in a browser, explicitly setting the target format."
+  (interactive)
+  (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
+         (info (org-export-get-environment 'quarto))
+         (args (plist-get info :quarto-preview-args))
+         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
+         (process-args (append (list "preview" (expand-file-name outfile) "--to" "html") args-list)))
+    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
+    (apply #'start-process "quarto-preview" "*quarto-preview*" "quarto" process-args)
+    (display-buffer "*quarto-preview*")))
+
+;;;###autoload
+(defun org-quarto-export-to-qmd-and-render (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto render'."
-  (org-quarto-export-to-qmd)
-  (shell-command (concat "quarto render " (org-export-output-file-name ".qmd"))))
+  (interactive)
+  (let ((outfile (org-quarto-export-to-qmd async subtreep visible-only)))
+    (compile (concat "quarto render " (shell-quote-argument (expand-file-name outfile))))))
 
 
 ;; Generate YAML frontmatter
@@ -137,6 +162,9 @@ Doing so will open HTML output from the QMD file in a browser."
      (when (and title
                 (plist-get info :with-title))
        (format "title: %s\n" (org-export-data title info)))
+     (when (and subtitle
+                (plist-get info :with-title))
+       (format "subtitle: %s\n" (org-export-data subtitle info)))
      (when (and date
                 (plist-get info :with-date))
        (format "date: %s\n" (org-export-data date info)))
