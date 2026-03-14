@@ -162,7 +162,10 @@ Doing so will open HTML output from the QMD file in a browser, explicitly settin
       (mapconcat 'identity (nreverse result-lines) "\n"))))
 
 (defun org-quarto--read-file-contents (filename)
-  "Read the contents of FILENAME and return them as a string."
+  "Read the contents of FILENAME and return them as a string.
+Signals a user error if FILENAME does not exist."
+  (unless (file-exists-p filename)
+    (user-error "QUARTO_FRONTMATTER file not found: %s" filename))
   (with-temp-buffer
     (insert-file-contents filename)
     (buffer-string)))
