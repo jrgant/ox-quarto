@@ -64,6 +64,14 @@
                    (:bibliography "BIBLIOGRAPHY" nil nil space)))
 
 
+;;; Utilities
+
+(defun org-quarto--check-quarto-binary ()
+  "Signal an error if the `quarto' executable cannot be found on PATH."
+  (unless (executable-find "quarto")
+    (user-error "Cannot find `quarto' executable on PATH")))
+
+
 ;;; Interactive functions
 
 ;;;###autoload
@@ -96,6 +104,7 @@ See documentation for `org-md-export-to-markdown'."
   "Export the Org file to Quarto and then run `quarto preview'.
 Doing so will open HTML output from the QMD file in a browser."
   (interactive)
+  (org-quarto--check-quarto-binary)
   (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
          (info (org-export-get-environment 'quarto))
          (args (plist-get info :quarto-preview-args))
@@ -110,6 +119,7 @@ Doing so will open HTML output from the QMD file in a browser."
   "Export the Org file to Quarto and then run `quarto preview --to html'.
 Doing so will open HTML output from the QMD file in a browser, explicitly setting the target format."
   (interactive)
+  (org-quarto--check-quarto-binary)
   (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
          (info (org-export-get-environment 'quarto))
          (args (plist-get info :quarto-preview-args))
@@ -123,11 +133,15 @@ Doing so will open HTML output from the QMD file in a browser, explicitly settin
 (defun org-quarto-export-to-qmd-and-render (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto render'."
   (interactive)
+  (org-quarto--check-quarto-binary)
   (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
          (info (org-export-get-environment 'quarto))
          (args (plist-get info :quarto-render-args))
-         (args-str (if (stringp args) (concat " " args) "")))
-    (compile (concat "quarto render " (shell-quote-argument (expand-file-name outfile)) args-str))))
+         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
+         (process-args (append (list "render" (expand-file-name outfile)) args-list)))
+    (message "Running: quarto %s" (mapconcat #'identity process-args " "))
+    (apply #'start-process "quarto-render" "*quarto-render*" "quarto" process-args)
+    (display-buffer "*quarto-render*")))
 
 
 ;; Generate YAML frontmatter
@@ -148,7 +162,10 @@ Doing so will open HTML output from the QMD file in a browser, explicitly settin
       (mapconcat 'identity (nreverse result-lines) "\n"))))
 
 (defun org-quarto--read-file-contents (filename)
-  "Read the contents of FILENAME and return them as a string."
+  "Read the contents of FILENAME and return them as a string.
+Signals a user error if FILENAME does not exist."
+  (unless (file-exists-p filename)
+    (user-error "QUARTO_FRONTMATTER file not found: %s" filename))
   (with-temp-buffer
     (insert-file-contents filename)
     (buffer-string)))
