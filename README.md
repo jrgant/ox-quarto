@@ -35,20 +35,68 @@ For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of co
 - **`org-cite`**: Fully supported natively. When using the `org-cite` syntax (e.g., `[cite:@key1;@key2]`), `ox-quarto` registers a custom export processor that translates the citations, prefixes, and locators into valid Pandoc Markdown citations (`[@key1; @key2]`).
 - **`org-ref`**: `ox-quarto` intercepts `org-ref` citation links (e.g., `cite:key1,key2`) and converts them into properly formatted Pandoc equivalents.
 
-### Quarto markup 
+### Quarto blocks (fenced divs)
 
-In the future, I hope to add support for parsing special blocks in Org, but for the moment, you should be able to pass native Quarto markup directly into the `.qmd` document.
-
-For the most part, Quarto markup written in the main body of the Org buffer should render correctly. In some cases, `ox-md` will insert escape characters that cause inconsistencies in rendered content. You should consider using a `markdown` source block when you run into problems.
+`ox-quarto` supports Quarto's fenced div syntax (`:::`) through Org special blocks. The block name becomes the CSS class in the exported `.qmd` file.
 
 ```org
-#+BEGIN_SRC markdown
+#+BEGIN_column-margin
+This appears in the margin.
+#+END_column-margin
+```
+
+exports to:
+
+```markdown
+::: {.column-margin}
+This appears in the margin.
+:::
+```
+
+This works for any Quarto div type: callouts (`callout-note`, `callout-warning`, etc.), content visibility (`content-hidden`, `content-visible`), column layouts (`column-margin`), and more.
+
+#### Callout titles
+
+For callout blocks, use the `:title` parameter on the `#+BEGIN_` line:
+
+```org
+#+BEGIN_callout-important :title "My Callout Title"
+Oh hai, Mark.
+#+END_callout-important
+```
+
+exports to:
+
+```markdown
 ::: {.callout-important}
 ## My Callout Title
 Oh hai, Mark.
 :::
-#+END_SRC
 ```
+
+#### Additional attributes
+
+You can pass attributes using `#+ATTR_QUARTO:` or inline parameters on the `#+BEGIN_` line. Inline parameters take precedence when both specify the same key.
+
+```org
+#+ATTR_QUARTO: :id my-note :collapse true
+#+BEGIN_callout-note :title "Collapsible note"
+This is a collapsible note.
+#+END_callout-note
+```
+
+exports to:
+
+```markdown
+::: {#my-note .callout-note collapse="true"}
+## Collapsible note
+This is a collapsible note.
+:::
+```
+
+### Other Quarto markup
+
+For Quarto markup that is not covered by special blocks, you can pass native Quarto/Pandoc markup directly. In some cases, `ox-md` will insert escape characters that cause inconsistencies in rendered content. You should consider using a `markdown` export block when you run into problems.
 
 Feed YAML arguments for computations within source code blocks just as you would in native Quarto:
 
