@@ -53,7 +53,8 @@
         (?r "To file and render"
             (lambda (a s v b)
               (org-quarto-export-to-qmd-and-render a s v)))))
-  :translate-alist '((link . org-quarto-link)
+  :translate-alist '((inline-src-block . org-quarto-inline-src-block)
+                     (link . org-quarto-link)
                      (plain-text . org-quarto-plain-text)
                      (special-block . org-quarto-special-block)
                      (src-block . org-quarto-src-block)
@@ -252,6 +253,14 @@ Signals a user error if FILENAME does not exist."
 
 
 ;; Source Blocks
+
+(defun org-quarto-inline-src-block (inline-src-block _contents _info)
+  "Transcode an INLINE-SRC-BLOCK element from Org to Quarto Markdown.
+Exports src_LANGUAGE[:exports code]{code} as \`language code\`."
+  (let ((lang (org-element-property :language inline-src-block))
+        (code (org-element-property :value inline-src-block)))
+    (format "`%s %s`" (downcase lang) code)))
+
 
 (defun org-quarto-src-block (src-block _contents info)
   "Transcode a SRC-BLOCK element from Org to Quarto Markdown.
