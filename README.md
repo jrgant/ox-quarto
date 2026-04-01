@@ -18,13 +18,12 @@ The package is in the early stages of development, and help from folks with more
 
 For now it's best to set `#+OPTIONS: toc:nil` to avoid rendering the table of contents directly in the `.qmd` document. `ox-quarto` will use Org's `TITLE`, `AUTHOR`, `DATE`, and `BIBLIOGRAPHY` fields, if available. If you have multiple bibliographies, you can use multiple `#+BIBLIOGRAPHY:` lines and they will be properly formatted as a YAML array.
 
-- `#+QUARTO_OPTIONS` :: Pass elements to Quarto's YAML frontmatter (ex., `toc:true toc-depth:2`). You can use multiple `#+QUARTO_OPTIONS` lines in your document; they will be concatenated automatically.
-
-- `#+QUARTO_FRONTMATTER` :: The name of a file containing YAML frontmatter content. This file will be inserted as is into the `.qmd` file's frontmatter block.
-
-- `#+QUARTO_PREVIEW_ARGS` :: Pass command line arguments to `quarto preview` when running preview from the export menu (ex., `--port 4444`). Can be specified across multiple lines.
-
-- `#+QUARTO_RENDER_ARGS` :: Pass command line arguments to `quarto render` when rendering from the export menu (ex., `--output testfile.docx`). Can be specified across multiple lines.
+| Option | Description |
+|:---|:---|
+| `#+QUARTO_OPTIONS` | Pass elements to Quarto's YAML frontmatter (ex., `toc:true toc-depth:2`). Multiple lines are concatenated automatically. |
+| `#+QUARTO_FRONTMATTER` | The name of a file containing YAML frontmatter content. Inserted as-is into the `.qmd` frontmatter block. |
+| `#+QUARTO_PREVIEW_ARGS` | Pass command line arguments to `quarto preview` when running preview from the export menu (ex., `--port 4444`). Can be specified across multiple lines. |
+| `#+QUARTO_RENDER_ARGS` | Pass command line arguments to `quarto render` when rendering from the export menu (ex., `--output testfile.docx`). Can be specified across multiple lines. |
 
 `ox-quarto` does not check for duplicate keys in the frontmatter, so if you use Org's `DATE` field and set `date` again in `QUARTO_OPTIONS` or your `QUARTO_FRONTMATTER` file, you will get a compilation error from `quarto-cli`.
 
