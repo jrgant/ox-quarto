@@ -55,6 +55,7 @@
               (org-quarto-export-to-qmd-and-render a s v)))))
   :translate-alist '((link . org-quarto-link)
                      (plain-text . org-quarto-plain-text)
+                     (special-block . org-quarto-special-block)
                      (src-block . org-quarto-src-block)
                      (template . org-quarto-template))
   :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
@@ -70,6 +71,48 @@
   "Signal an error if the `quarto' executable cannot be found on PATH."
   (unless (executable-find "quarto")
     (user-error "Cannot find `quarto' executable on PATH")))
+
+(defun org-quarto--parse-parameters (params-str)
+  "Parse a PARAMS-STR of `:key value' pairs into a plist.
+Values enclosed in double quotes have the quotes stripped."
+  (when (and params-str (org-string-nw-p params-str))
+    (let ((result '())
+          (remaining (string-trim params-str)))
+      (while (string-match "\\(:[^ \t\n]+\\)\\s-+\\(\"[^\"]*\"\\|[^ \t\n]+\\)" remaining)
+        (let ((key (intern (match-string 1 remaining)))
+              (val (match-string 2 remaining)))
+          (when (string-match "\\`\"\\(.*\\)\"\\'" val)
+            (setq val (match-string 1 val)))
+          (setq result (plist-put result key val))
+          (setq remaining (substring remaining (match-end 0)))))
+      result)))
+
+(defun org-quarto--build-div-header (block-type id extra-classes attributes)
+  "Build a Quarto fenced div header string.
+BLOCK-TYPE is the primary class (from the Org block name).  ID is an
+optional element id.  EXTRA-CLASSES is an optional space-separated string
+of additional CSS classes.  ATTRIBUTES is the full parsed plist from
+#+ATTR_QUARTO: and/or inline parameters, from which key-value pairs
+\(excluding :id, :class, and :title) are rendered as key=\"value\"
+attributes."
+  (let ((parts '()))
+    ;; ID
+    (when (and id (org-string-nw-p id))
+      (push (concat "#" id) parts))
+    ;; Primary class from block type
+    (push (concat "." block-type) parts)
+    ;; Extra classes
+    (when (and extra-classes (org-string-nw-p extra-classes))
+      (dolist (cls (split-string extra-classes "[ \t]+" t))
+        (push (concat "." cls) parts)))
+    ;; Key-value attributes (skip :id, :class, and :title)
+    (let ((plist attributes))
+      (while plist
+        (let ((key (pop plist))
+              (val (pop plist)))
+          (unless (memq key '(:id :class :title))
+            (push (format "%s=\"%s\"" (substring (symbol-name key) 1) val) parts)))))
+    (concat "::: {" (mapconcat #'identity (nreverse parts) " ") "}")))
 
 
 ;;; Interactive functions
@@ -218,6 +261,41 @@ INFO is a plist holding contextual information."
     "```{" (downcase lang) "}\n"
     (org-export-format-code-default src-block info)
     "```")))
+
+
+;; Special Blocks (Quarto fenced divs)
+
+(defun org-quarto-special-block (special-block contents info)
+  "Transcode a SPECIAL-BLOCK element from Org to a Quarto fenced div.
+The block type name becomes the primary CSS class.  Additional attributes
+can be specified via #+ATTR_QUARTO: or inline parameters on the #+BEGIN_
+line.  Inline parameters take precedence over #+ATTR_QUARTO: when both
+specify the same key.
+
+The special :title parameter emits a ## heading inside the div (used for
+callout titles).  INFO is a plist holding contextual information."
+  (let* ((block-type (org-element-property :type special-block))
+         (attr-quarto (org-export-read-attribute :attr_quarto special-block))
+         (inline-params (org-quarto--parse-parameters
+                         (org-element-property :parameters special-block)))
+         ;; Merge: inline params override attr_quarto
+         (attributes (let ((merged (copy-sequence attr-quarto)))
+                       (cl-loop for (key val) on inline-params by #'cddr
+                                do (setq merged (plist-put merged key val)))
+                       merged))
+         (id (plist-get attributes :id))
+         (extra-classes (plist-get attributes :class))
+         (title (plist-get attributes :title))
+         (header (org-quarto--build-div-header block-type id extra-classes attributes)))
+    (concat header "\n"
+            ;; Emit title as ## heading if provided
+            (when title (concat "## " title "\n"))
+            ;; Un-escape \# so that Markdown headings work inside fenced divs.
+            ;; org-quarto-plain-text escapes # at line beginnings to prevent
+            ;; unintended Markdown headings, but inside a fenced div they are
+            ;; intentional (e.g., callout titles).
+            (replace-regexp-in-string "\\\\#" "#" contents)
+            ":::\n")))
 
 
 ;; Links
