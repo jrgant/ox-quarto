@@ -53,7 +53,12 @@
         (?r "To file and render"
             (lambda (a s v b)
               (org-quarto-export-to-qmd-and-render a s v)))))
-  :translate-alist '((link . org-quarto-link)
+  :translate-alist '((footnote-definition . org-quarto-footnote-definition)
+                     (footnote-reference . org-quarto-footnote-reference)
+                     (inline-src-block . org-quarto-inline-src-block)
+                     (inner-template . org-quarto-inner-template)
+                     (link . org-quarto-link)
+                     (paragraph . org-quarto-paragraph)
                      (plain-text . org-quarto-plain-text)
                      (special-block . org-quarto-special-block)
                      (src-block . org-quarto-src-block)
@@ -251,7 +256,63 @@ Signals a user error if FILENAME does not exist."
      "---\n\n")))
 
 
+;; Footnotes
+
+(defvar org-quarto--pending-inline-fn-defs nil
+  "Alist of (label . content) for inline footnote definitions pending output.
+Populated during transcoding of inline footnotes; consumed and reset by
+`org-quarto-template'.")
+
+(defun org-quarto-footnote-reference (footnote-reference contents _info)
+  "Transcode a FOOTNOTE-REFERENCE element from Org to Quarto Markdown.
+Standard references [fn:ID] become [^ID].  Inline footnotes
+[fn:ID: content] emit [^ID] at the reference site and register the
+definition for output at end of document via `org-quarto-template'.
+Anonymous footnotes [fn:: content] become ^[content]."
+  (pcase (org-element-property :type footnote-reference)
+    (`standard (format "[^%s]" (org-element-property :label footnote-reference)))
+    (`inline
+     (let ((label (org-element-property :label footnote-reference)))
+       (push (cons label (org-trim contents)) org-quarto--pending-inline-fn-defs)
+       (format "[^%s]" label)))
+    (_ (format "^[%s]" (org-trim contents)))))
+
+(defun org-quarto-footnote-definition (footnote-definition contents _info)
+  "Transcode a FOOTNOTE-DEFINITION element from Org to Quarto Markdown.
+[fn:ID] content becomes [^ID]: content."
+  (format "[^%s]: %s"
+          (org-element-property :label footnote-definition)
+          (org-trim contents)))
+
+
+;; Paragraphs
+
+(defun org-quarto-paragraph (paragraph contents info)
+  "Transcode a PARAGRAPH element from Org to Quarto Markdown.
+Delegates to `org-md-paragraph', then appends any named inline footnote
+definitions that were registered during transcoding of this paragraph's
+contents."
+  (let ((text (org-md-paragraph paragraph contents info))
+        (defs (prog1 (nreverse org-quarto--pending-inline-fn-defs)
+                (setq org-quarto--pending-inline-fn-defs nil))))
+    (if defs
+        (concat text "\n"
+                (mapconcat (lambda (pair)
+                             (format "[^%s]: %s" (car pair) (cdr pair)))
+                           defs "\n")
+                "\n")
+      text)))
+
+
 ;; Source Blocks
+
+(defun org-quarto-inline-src-block (inline-src-block _contents _info)
+  "Transcode an INLINE-SRC-BLOCK element from Org to Quarto Markdown.
+Exports src_LANGUAGE[:exports code]{code} as \`language code\`."
+  (let ((lang (org-element-property :language inline-src-block))
+        (code (org-element-property :value inline-src-block)))
+    (format "`%s %s`" (downcase lang) code)))
+
 
 (defun org-quarto-src-block (src-block _contents info)
   "Transcode a SRC-BLOCK element from Org to Quarto Markdown.
@@ -377,11 +438,23 @@ STYLE is the citation style.  INFO is the export state."
 
 ;; Template
 
+(defun org-quarto-inner-template (contents info)
+  "Return body of document after Quarto Markdown conversion.
+Suppresses the footnote section appended by `org-md-inner-template',
+since Quarto handles footnote rendering from the .qmd source.
+CONTENTS is the transcoded contents string.  INFO is a plist used as a
+communication channel."
+  (let ((depth (plist-get info :with-toc)))
+    (concat
+     (when depth
+       (concat (org-md--build-toc info (and (wholenump depth) depth)) "\n"))
+     contents)))
+
 (defun org-quarto-template (contents info)
   "Return complete document string after Quarto Markdown conversion.
 This function concatenates the YAML frontmatter and the document CONTENTS. INFO
 is a plist used as a communication channel."
-  ;; Build up YAML frontmatter
+  (setq org-quarto--pending-inline-fn-defs nil)
   (concat
    (org-quarto-yaml-frontmatter info)
    contents))
