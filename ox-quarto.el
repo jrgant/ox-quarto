@@ -341,7 +341,7 @@ INFO is a plist holding contextual information."
 
 ;; Special Blocks (Quarto fenced divs)
 
-(defun org-quarto-special-block (special-block contents info)
+(defun org-quarto-special-block (special-block contents _info)
   "Transcode a SPECIAL-BLOCK element from Org to a Quarto fenced div.
 The block type name becomes the primary CSS class.  Additional attributes
 can be specified via #+ATTR_QUARTO: or inline parameters on the #+BEGIN_
@@ -349,7 +349,7 @@ line.  Inline parameters take precedence over #+ATTR_QUARTO: when both
 specify the same key.
 
 The special :title parameter emits a ## heading inside the div (used for
-callout titles).  INFO is a plist holding contextual information."
+callout titles)."
   (let* ((block-type (org-element-property :type special-block))
          (attr-quarto (org-export-read-attribute :attr_quarto special-block))
          (inline-params (org-quarto--parse-parameters
