@@ -63,7 +63,7 @@
                      (special-block . org-quarto-special-block)
                      (src-block . org-quarto-src-block)
                      (template . org-quarto-template))
-  :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil t)
+  :options-alist `((:quarto-frontmatter "QUARTO_FRONTMATTER" nil nil space)
                    (:quarto-options "QUARTO_OPTIONS" nil nil space)
                    (:quarto-preview-args "QUARTO_PREVIEW_ARGS" nil nil space)
                    (:quarto-render-args "QUARTO_RENDER_ARGS" nil nil space)
@@ -165,7 +165,8 @@ Doing so will open HTML output from the QMD file in a browser."
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-preview-html (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto preview --to html'.
-Doing so will open HTML output from the QMD file in a browser, explicitly setting the target format."
+Doing so will open HTML output from the QMD file in a browser, explicitly
+setting the target format."
   (interactive)
   (org-quarto--check-quarto-binary)
   (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
@@ -218,6 +219,20 @@ Signals a user error if FILENAME does not exist."
     (insert-file-contents filename)
     (buffer-string)))
 
+(defun org-quarto--resolve-frontmatter (value info)
+  "Return YAML content from VALUE, which may be a filename or inline YAML.
+If VALUE names an existing file, it is resolved relative to the directory of
+the input .org file (falling back to `default-directory'), and its contents
+are returned.  Otherwise VALUE is returned as inline YAML."
+  (let* ((input-file (plist-get info :input-file))
+         (base-dir (if input-file
+                       (file-name-directory input-file)
+                     default-directory))
+         (candidate (expand-file-name (string-trim value) base-dir)))
+    (if (file-exists-p candidate)
+        (org-quarto--read-file-contents candidate)
+      value)))
+
 (defun org-quarto-yaml-frontmatter (info)
   "Return YAML frontmatter string from INFO for Quarto Markdown export."
   (let ((title (plist-get info :title))
@@ -249,7 +264,7 @@ Signals a user error if FILENAME does not exist."
                    (mapconcat (lambda (b) (format "  - %s" b)) bibs "\n")
                    "\n"))))
      (when quarto_yml
-       (format "%s\n" (org-quarto--read-file-contents (org-export-data quarto_yml info))))
+       (format "%s\n" (org-quarto--resolve-frontmatter quarto_yml info)))
      ;; Wrangle and format QUARTO_OPTIONS
      (when quarto_opts
        (concat (org-quarto--wrangle-options quarto_opts) "\n"))
