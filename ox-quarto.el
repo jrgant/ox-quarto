@@ -24,6 +24,7 @@
 
 (require 'cl-lib)
 (require 'format-spec)
+(require 'ob-core)
 (require 'ox)
 (require 'ox-md)
 (require 'ox-publish)
@@ -93,6 +94,34 @@ delimiters ($...$).  Other entities fall back to their UTF-8 representation."
 
 ;;; Utilities
 
+(defmacro org-quarto--with-babel-defaults (&rest body)
+  "Evaluate BODY with Babel export defaults suited to Quarto.
+
+Org defaults inline source blocks to `:exports results', so
+`org-babel-exp-process-buffer' replaces `src_LANG{code}' with its
+evaluated result -- or with nothing at all when evaluation is suppressed
+-- while running on `org-export-before-parsing-functions', i.e. before
+the parse tree is built.  `org-quarto-inline-src-block' therefore never
+sees the element and the code silently vanishes from the .qmd.
+
+Quarto (via knitr or Jupyter) is the intended evaluator here, exactly as
+it is for `src-block', so default inline blocks to `:exports code'
+instead.  Writing `src_LANG[:exports results]{code}' explicitly still
+overrides this and hands evaluation back to Org.
+
+Note: this is a dynamic binding around the export call, so it does not
+reach asynchronous exports, which re-run `org-export-as' in a separate
+Emacs process.  Customize `org-babel-default-inline-header-args' if you
+export asynchronously."
+  (declare (indent 0) (debug t))
+  `(let ((org-babel-default-inline-header-args
+          ;; Prepending is not enough: within one alist `org-babel-merge-params'
+          ;; lets the *last* pair for a key win, so drop the original first.
+          (cons '(:exports . "code")
+                (assq-delete-all
+                 :exports (copy-alist org-babel-default-inline-header-args)))))
+     ,@body))
+
 (defun org-quarto--check-quarto-binary ()
   "Signal an error if the `quarto' executable cannot be found on PATH."
   (unless (executable-find "quarto")
@@ -150,15 +179,17 @@ This can be used in any buffer.  For example, you can write an
 itemized list in Org syntax in a Markdown buffer and use
 this command to convert it."
   (interactive)
-  (org-export-replace-region-by 'quarto))
+  (org-quarto--with-babel-defaults
+    (org-export-replace-region-by 'quarto)))
 
 ;;;###autoload
 (defun org-quarto-export-as-qmd (&optional async subtreep visible-only)
   "Export current buffer to a Quarto Markdown buffer.
 See documentation for `org-md-export-as-markdown'."
   (interactive)
-  (org-export-to-buffer 'quarto "*Org Quarto Export*"
-    async subtreep visible-only nil nil (lambda () (text-mode))))
+  (org-quarto--with-babel-defaults
+    (org-export-to-buffer 'quarto "*Org Quarto Export*"
+      async subtreep visible-only nil nil (lambda () (text-mode)))))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd (&optional async subtreep visible-only)
@@ -166,7 +197,8 @@ See documentation for `org-md-export-as-markdown'."
 See documentation for `org-md-export-to-markdown'."
   (interactive)
   (let ((outfile (org-export-output-file-name ".qmd" subtreep)))
-    (org-export-to-file 'quarto outfile async subtreep visible-only)))
+    (org-quarto--with-babel-defaults
+      (org-export-to-file 'quarto outfile async subtreep visible-only))))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-preview (&optional async subtreep visible-only)
