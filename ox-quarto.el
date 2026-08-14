@@ -63,6 +63,8 @@
                      (plain-text . org-quarto-plain-text)
                      (special-block . org-quarto-special-block)
                      (src-block . org-quarto-src-block)
+                     (subscript . org-quarto-subscript)
+                     (superscript . org-quarto-superscript)
                      (table . org-quarto-table)
                      (table-cell . org-quarto-table-cell)
                      (table-row . org-quarto-table-row)
@@ -751,6 +753,39 @@ and simply removes the activation of smart-quote export."
   ;; Return value.
   text)
 
+
+;; Sub- and superscripts
+
+(defun org-quarto--sub-superscript (contents delimiter)
+  "Wrap CONTENTS in DELIMITER as a Pandoc sub- or superscript span.
+DELIMITER is \"~\" for subscripts or \"^\" for superscripts.  Pandoc
+spans of this kind cannot contain unescaped whitespace, so runs of
+spaces, tabs and newlines in CONTENTS become `\\ ', and any literal
+DELIMITER character is backslash-escaped so it does not close the span.
+Backslashes are left alone: CONTENTS has already been escaped by
+`org-quarto-plain-text'.  Returns the empty string for empty CONTENTS."
+  (let ((text (org-trim (or contents ""))))
+    (if (not (org-string-nw-p text))
+        ""
+      (setq text (replace-regexp-in-string
+                  (regexp-quote delimiter) (concat "\\" delimiter) text t t))
+      (setq text (replace-regexp-in-string "[ \t\n]+" "\\ " text t t))
+      (concat delimiter text delimiter))))
+
+(defun org-quarto-subscript (_subscript contents _info)
+  "Transcode a SUBSCRIPT object from Org to Quarto Markdown.
+_{x} becomes ~x~, Pandoc's subscript syntax.  Whether a given `_'
+construct reaches this transcoder is decided by the `^' export option:
+with `^:{}' only the braced form is a subscript, with `^:t' the
+brace-less form is too, and with `^:nil' neither is."
+  (org-quarto--sub-superscript contents "~"))
+
+(defun org-quarto-superscript (_superscript contents _info)
+  "Transcode a SUPERSCRIPT object from Org to Quarto Markdown.
+^{x} becomes ^x^, Pandoc's superscript syntax.  See
+`org-quarto-subscript' for how the `^' export option selects which
+constructs are transcoded."
+  (org-quarto--sub-superscript contents "^"))
 
 
 ;; Citations
