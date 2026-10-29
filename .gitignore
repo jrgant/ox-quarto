@@ -3,3 +3,6 @@ conversions/
 .agent-shell/
 Makefile
 CLAUDE.md
+*bbl
+*bcf*
+*fdb_latexmk
