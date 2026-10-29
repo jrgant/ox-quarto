@@ -2,3 +2,4 @@ examples/
 conversions/
 .agent-shell/
 Makefile
+CLAUDE.md
