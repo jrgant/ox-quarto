@@ -284,6 +284,38 @@ For Quarto markup that is not covered by special blocks, you can pass native Qua
 
 `M-x org-quarto-convert-region-to-qmd` converts a selected region of Org syntax to Quarto Markdown in place. This can be used in any buffer.
 
+### Browser
+
+After a preview starts, `ox-quarto` opens it as set by `org-quarto-browser`:
+
+| Value               | Behavior                                                                 |
+|:--------------------|:-------------------------------------------------------------------------|
+| `"xdg-open"`        | Default. Open with the system's default browser.                         |
+| `"firefox"`, etc.   | Open with the named browser program.                                     |
+| `xwidget`           | Open in an `xwidget-webkit` buffer inside Emacs (needs xwidgets support). |
+| `nil`               | Let `quarto preview` open its own browser.                               |
+
+For preview, `ox-quarto` passes `--no-browser` to Quarto and opens the URL itself. If `#+QUARTO_PREVIEW_ARGS` already contains `--no-browser`, nothing is opened.
+
+To open the output after a render as well, set `org-quarto-open-after-render` to `t` (off by default). HTML output then goes to `org-quarto-browser`. Any other output (PDF, DOCX, ...) is visited in Emacs with whatever mode you already use for it, such as pdf-tools' `pdf-view-mode`. Re-rendering reverts the existing buffer instead of opening a new one.
+
+When a render produces several formats at once, `org-quarto-output-preferred-format` picks which file to open. Set it to a file extension (`"pdf"`) or a list of extensions in order of preference (`'("pdf" "docx")`). If it is `nil` (the default) or nothing matches, the first file Quarto reports is opened.
+
+Two options control where the xwidget window and rendered files open:
+
+- `org-quarto-output-window-side`: `right` (default), `left`, `above`, or `below` the Org window.
+- `org-quarto-output-window-size`: a fraction of the Org window (default `0.5`), or an integer number of columns. For `above` and `below`, it sets the height, in lines when it is an integer.
+
+```elisp
+(setq org-quarto-browser 'xwidget
+      org-quarto-open-after-render t
+      org-quarto-output-preferred-format "pdf"
+      org-quarto-output-window-side 'right
+      org-quarto-output-window-size 0.4)
+```
+
+Later previews reuse the same xwidget buffer.
+
 
 ## Testing
 

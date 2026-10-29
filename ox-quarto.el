@@ -31,6 +31,92 @@
 (require 'table)
 (require 'oc)
 
+(declare-function xwidget-buffer "xwidget.c" (xwidget))
+(declare-function xwidget-webkit-current-session "xwidget" ())
+(declare-function xwidget-webkit-goto-uri "xwidget" (xwidget uri))
+(declare-function xwidget-webkit-new-session "xwidget" (url))
+(defvar xwidget-webkit-last-session-buffer)
+(defvar compilation-filter-start)
+
+
+;;; User-Configurable Variables
+
+(defgroup org-export-quarto nil
+  "Options specific to Quarto export backend."
+  :tag "Org Quarto"
+  :group 'org-export)
+
+(defcustom org-quarto-browser "xdg-open"
+  "How to open Quarto output after preview or render.
+
+The value may be:
+
+  a string    the name of a program (e.g. \"xdg-open\", \"firefox\",
+              \"chromium\") that is called with the URL as its only
+              argument
+  `xwidget'   an xwidget-webkit buffer inside Emacs, placed according
+              to `org-quarto-output-window-side' and
+              `org-quarto-output-window-size'; requires Emacs built
+              with xwidgets support
+  nil         let `quarto preview' open its own default browser, and
+              open no HTML output after `quarto render'
+
+For preview, ox-quarto passes `--no-browser' to Quarto and opens the
+\"Browse at\" URL itself, unless this is nil or QUARTO_PREVIEW_ARGS
+already contains `--no-browser'.  For render, HTML output is opened
+this way only when `org-quarto-open-after-render' is non-nil."
+  :group 'org-export-quarto
+  :type '(choice (string :tag "Program")
+                 (const :tag "xwidget-webkit" xwidget)
+                 (const :tag "Let Quarto decide" nil)))
+
+(defcustom org-quarto-open-after-render nil
+  "Non-nil means open the output file after `quarto render' succeeds.
+HTML output is opened as set by `org-quarto-browser'.  Any other output
+\\(PDF, DOCX, ...) is visited in Emacs with whatever mode is already set
+up for it (e.g. `pdf-view-mode' from pdf-tools), in a window placed by
+`org-quarto-output-window-side' and `org-quarto-output-window-size'.
+When a render produces several files, the one chosen by
+`org-quarto-output-preferred-format' is opened."
+  :group 'org-export-quarto
+  :type 'boolean)
+
+(defcustom org-quarto-output-preferred-format nil
+  "Which output to open when `quarto render' produces several files.
+The value is a file extension such as \"pdf\", \"docx\" or \"html\", or
+a list of them in order of preference.  The first preference matching
+a created file wins; when none match, or this is nil, the first file
+Quarto reports is opened.  Only used when `org-quarto-open-after-render'
+is non-nil."
+  :group 'org-export-quarto
+  :type '(choice (const :tag "First file Quarto reports" nil)
+                 (string :tag "Extension")
+                 (repeat :tag "Extensions, in order of preference" string)))
+
+(define-obsolete-variable-alias 'org-quarto-xwidget-side
+  'org-quarto-output-window-side "2026-10-29")
+(define-obsolete-variable-alias 'org-quarto-xwidget-window-size
+  'org-quarto-output-window-size "2026-10-29")
+
+(defcustom org-quarto-output-window-side 'right
+  "Where to place the output window, relative to the Org window.
+Used for the xwidget-webkit window when `org-quarto-browser' is
+`xwidget', and for rendered files visited in Emacs (see
+`org-quarto-open-after-render')."
+  :group 'org-export-quarto
+  :type '(choice (const right) (const left) (const above) (const below)))
+
+(defcustom org-quarto-output-window-size 0.5
+  "Size of the output window when ox-quarto creates it.
+A float between 0 and 1 is a fraction of the Org window; an integer is
+a number of columns.  For `above' and `below' placement (see
+`org-quarto-output-window-side') this is the window height, in lines
+when an integer.  Applies to the same windows as
+`org-quarto-output-window-side'."
+  :group 'org-export-quarto
+  :type '(choice (float :tag "Fraction of Org window")
+                 (integer :tag "Columns or lines")))
+
 
 ;;; Define Back-End
 
@@ -127,6 +213,170 @@ export asynchronously."
   (unless (executable-find "quarto")
     (user-error "Cannot find `quarto' executable on PATH")))
 
+(defvar org-quarto--xwidget-buffer nil
+  "The xwidget-webkit session buffer ox-quarto reuses for its output.")
+
+(defun org-quarto--output-window (buffer origin)
+  "Return a window for output BUFFER, splitting window ORIGIN if needed.
+An existing window showing BUFFER is reused; otherwise ORIGIN is split
+per `org-quarto-output-window-side' and `org-quarto-output-window-size'."
+  (or (and (buffer-live-p buffer)
+           (get-buffer-window buffer t))
+      (let* ((origin (if (window-live-p origin) origin (selected-window)))
+             (side org-quarto-output-window-side)
+             (horizontal (memq side '(left right)))
+             (total (if horizontal
+                        (window-total-width origin)
+                      (window-total-height origin)))
+             (size (if (floatp org-quarto-output-window-size)
+                       (round (* total org-quarto-output-window-size))
+                     org-quarto-output-window-size))
+             (size (max size (if horizontal window-min-width window-min-height))))
+        ;; A negative SIZE sizes the new window rather than ORIGIN.
+        (split-window origin (- size) side))))
+
+(defun org-quarto--browse-url-xwidget (url origin)
+  "Show URL in an xwidget-webkit window placed relative to window ORIGIN."
+  (unless (featurep 'xwidget-internal)
+    (user-error "Emacs was not compiled with xwidgets support"))
+  (require 'xwidget)
+  (let ((window (org-quarto--output-window org-quarto--xwidget-buffer origin)))
+    (if (buffer-live-p org-quarto--xwidget-buffer)
+        (progn
+          (set-window-buffer window org-quarto--xwidget-buffer)
+          (with-current-buffer org-quarto--xwidget-buffer
+            (xwidget-webkit-goto-uri (xwidget-webkit-current-session) url)))
+      ;; The widget takes its pixel size from the selected window.
+      (with-selected-window window
+        (xwidget-webkit-new-session url)
+        (setq org-quarto--xwidget-buffer xwidget-webkit-last-session-buffer)
+        (set-window-buffer window org-quarto--xwidget-buffer)))))
+
+(defun org-quarto--open-url (url origin)
+  "Open URL according to `org-quarto-browser'.
+ORIGIN is the window the export was started from."
+  (pcase org-quarto-browser
+    ('nil nil)
+    ('xwidget (org-quarto--browse-url-xwidget url origin))
+    ((and (pred stringp) program)
+     (unless (executable-find program)
+       (user-error "Cannot find browser program `%s'" program))
+     (message "Opening %s with %s" url program)
+     (let ((process-connection-type nil))
+       (start-process "org-quarto-browser" nil program url)))
+    (other (user-error "Invalid `org-quarto-browser': %S" other))))
+
+(defun org-quarto--open-file-in-emacs (file origin)
+  "Visit FILE in a window placed relative to window ORIGIN.
+A buffer already visiting FILE is reverted, so a re-render is shown
+without a \"file changed on disk\" prompt.
+
+The window is created first and selected while FILE is visited:
+image-based modes such as `doc-view-mode' and `pdf-view-mode' tie
+their display state to the selected window when they start."
+  (let* ((buffer (get-file-buffer file))
+         (window (org-quarto--output-window buffer origin)))
+    (with-selected-window window
+      (if buffer
+          (progn
+            (set-window-buffer window buffer)
+            (with-current-buffer buffer
+              (revert-buffer t t t)))
+        (set-window-buffer window (find-file-noselect file))))))
+
+(defvar-local org-quarto--origin-window nil
+  "Window the Quarto export was started from, local to the process buffer.")
+
+(defvar-local org-quarto--url-opened nil
+  "Non-nil once the preview URL has been opened, local to the process buffer.")
+
+(defconst org-quarto--browse-at-regexp
+  ;; Quarto colours the line, so allow ANSI escapes around the URL.
+  "Browse at[[:space:]\e[0-9;m]*\\(https?://[^[:space:]\e]+\\)[[:space:]\e]"
+  "Regexp matching the URL `quarto preview' serves its output at.")
+
+(defun org-quarto--preview-filter ()
+  "Open the `quarto preview' URL once it appears in the process buffer."
+  (unless org-quarto--url-opened
+    (save-excursion
+      (goto-char (point-min))
+      (when (re-search-forward org-quarto--browse-at-regexp nil t)
+        (setq org-quarto--url-opened t)
+        (org-quarto--open-url (match-string-no-properties 1)
+                              org-quarto--origin-window)))))
+
+(defun org-quarto--render-outputs (buffer)
+  "Return the existing files listed as `Output created:' in BUFFER, in order."
+  (with-current-buffer buffer
+    (save-excursion
+      (goto-char (point-min))
+      (let (files)
+        (while (re-search-forward "^Output created: \\(.+\\)$" nil t)
+          (let ((file (expand-file-name
+                       (string-trim (match-string-no-properties 1)))))
+            (when (file-exists-p file)
+              (push file files))))
+        (nreverse files)))))
+
+(defun org-quarto--preferred-output (files)
+  "Pick the file to open from FILES per `org-quarto-output-preferred-format'."
+  (or (seq-some (lambda (ext)
+                  (seq-find (lambda (f)
+                              (string= (downcase (or (file-name-extension f) ""))
+                                       (downcase (string-remove-prefix "." ext))))
+                            files))
+                (ensure-list org-quarto-output-preferred-format))
+      (car files)))
+
+(defun org-quarto--render-finish (buffer msg)
+  "Open the output listed in BUFFER after `quarto render' finishes.
+MSG is the process status message from `compilation-finish-functions'.
+HTML goes to `org-quarto--open-url'; anything else is visited in Emacs."
+  (when (string-prefix-p "finished" msg)
+    (let ((file (org-quarto--preferred-output
+                 (org-quarto--render-outputs buffer)))
+          (origin (buffer-local-value 'org-quarto--origin-window buffer)))
+      (cond ((null file) nil)
+            ((string-match-p "\\.html?\\'" file)
+             (org-quarto--open-url (concat "file://" file) origin))
+            (t (org-quarto--open-file-in-emacs file origin))))))
+
+(defun org-quarto--run-quarto (args buffer-name &optional setup)
+  "Run quarto with ARGS in a compilation buffer named BUFFER-NAME.
+The buffer is shown in a bottom side window.  SETUP, if non-nil, is
+called with no arguments in the compilation buffer after it starts."
+  (let* ((origin (selected-window))
+         (cmd (mapconcat #'shell-quote-argument (cons "quarto" args) " "))
+         (display-buffer-alist
+          (cons `(,(regexp-quote buffer-name)
+                  (display-buffer-in-side-window)
+                  (side . bottom)
+                  (window-height . 0.25))
+                display-buffer-alist))
+         (buffer (compilation-start cmd nil (lambda (_) buffer-name))))
+    (with-current-buffer buffer
+      (setq org-quarto--origin-window origin)
+      (when setup (funcall setup)))
+    buffer))
+
+(defun org-quarto--preview (outfile args)
+  "Run `quarto preview' on OUTFILE with extra ARGS, opening the result."
+  (let ((open-p (and org-quarto-browser
+                     (not (member "--no-browser" args)))))
+    (org-quarto--run-quarto
+     (append (list "preview" (expand-file-name outfile))
+             args
+             (and open-p '("--no-browser")))
+     "*quarto-preview*"
+     (and open-p
+          (lambda ()
+            (add-hook 'compilation-filter-hook
+                      #'org-quarto--preview-filter nil t))))))
+
+(defun org-quarto--split-args (args)
+  "Split the string ARGS on whitespace, or return nil if it is not a string."
+  (and (stringp args) (split-string args "[ \t\n]+" t)))
+
 (defun org-quarto--parse-parameters (params-str)
   "Parse a PARAMS-STR of `:key value' pairs into a plist.
 Values enclosed in double quotes have the quotes stripped."
@@ -203,65 +453,46 @@ See documentation for `org-md-export-to-markdown'."
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-preview (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto preview'.
-Doing so will open HTML output from the QMD file in a browser."
+Doing so will open HTML output from the QMD file as set by
+`org-quarto-browser'."
   (interactive)
   (org-quarto--check-quarto-binary)
   (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
-         (info (org-export-get-environment 'quarto))
-         (args (plist-get info :quarto-preview-args))
-         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
-         (cmd (mapconcat #'shell-quote-argument
-                         (append (list "quarto" "preview" (expand-file-name outfile)) args-list)
-                         " ")))
-    (let ((display-buffer-alist
-           (cons '("\\*quarto-preview\\*"
-                   (display-buffer-in-side-window)
-                   (side . bottom)
-                   (window-height . 0.25))
-                 display-buffer-alist)))
-      (compilation-start cmd nil (lambda (_) "*quarto-preview*")))))
+         (info (org-export-get-environment 'quarto)))
+    (org-quarto--preview
+     outfile (org-quarto--split-args (plist-get info :quarto-preview-args)))))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-preview-html (&optional async subtreep visible-only)
   "Export the Org file to Quarto and then run `quarto preview --to html'.
-Doing so will open HTML output from the QMD file in a browser, explicitly
-setting the target format."
+Doing so will open HTML output from the QMD file as set by
+`org-quarto-browser', explicitly setting the target format."
   (interactive)
   (org-quarto--check-quarto-binary)
   (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
-         (info (org-export-get-environment 'quarto))
-         (args (plist-get info :quarto-preview-args))
-         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
-         (cmd (mapconcat #'shell-quote-argument
-                         (append (list "quarto" "preview" (expand-file-name outfile) "--to" "html") args-list)
-                         " ")))
-    (let ((display-buffer-alist
-           (cons '("\\*quarto-preview\\*"
-                   (display-buffer-in-side-window)
-                   (side . bottom)
-                   (window-height . 0.25))
-                 display-buffer-alist)))
-      (compilation-start cmd nil (lambda (_) "*quarto-preview*")))))
+         (info (org-export-get-environment 'quarto)))
+    (org-quarto--preview
+     outfile (append '("--to" "html")
+                     (org-quarto--split-args
+                      (plist-get info :quarto-preview-args))))))
 
 ;;;###autoload
 (defun org-quarto-export-to-qmd-and-render (&optional async subtreep visible-only)
-  "Export the Org file to Quarto and then run `quarto render'."
+  "Export the Org file to Quarto and then run `quarto render'.
+When `org-quarto-open-after-render' is non-nil, the output is then
+opened; see that variable."
   (interactive)
   (org-quarto--check-quarto-binary)
   (let* ((outfile (org-quarto-export-to-qmd async subtreep visible-only))
-         (info (org-export-get-environment 'quarto))
-         (args (plist-get info :quarto-render-args))
-         (args-list (if (stringp args) (split-string args "[ \t\n]+" t) nil))
-         (cmd (mapconcat #'shell-quote-argument
-                         (append (list "quarto" "render" (expand-file-name outfile)) args-list)
-                         " ")))
-    (let ((display-buffer-alist
-           (cons '("\\*quarto-render\\*"
-                   (display-buffer-in-side-window)
-                   (side . bottom)
-                   (window-height . 0.25))
-                 display-buffer-alist)))
-      (compilation-start cmd nil (lambda (_) "*quarto-render*")))))
+         (info (org-export-get-environment 'quarto)))
+    (org-quarto--run-quarto
+     (append (list "render" (expand-file-name outfile))
+             (org-quarto--split-args (plist-get info :quarto-render-args)))
+     "*quarto-render*"
+     (lambda ()
+       (when org-quarto-open-after-render
+         (add-hook 'compilation-finish-functions
+                   #'org-quarto--render-finish nil t))))))
 
 
 ;; Generate YAML frontmatter
