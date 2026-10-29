@@ -699,9 +699,10 @@ Multiple #+ATTR_QUARTO: lines are supported and merged."
     (let* ((attr (org-export-read-attribute :attr_quarto table))
            (align-spec (let ((a (plist-get attr :align)))
                          (when a (if (stringp a) a (format "%s" a)))))
-           (label (or (org-element-property :name table)
-                      (let ((l (plist-get attr :label)))
-                        (when l (if (stringp l) l (format "%s" l))))))
+           (label (org-quarto--xref-label
+                   (or (org-element-property :name table)
+                       (let ((l (plist-get attr :label)))
+                         (when l (if (stringp l) l (format "%s" l)))))))
            (caption (when-let* ((c (org-export-get-caption table)))
                       (org-export-data c info)))
            (col-widths (org-quarto--table-col-widths table))
@@ -734,12 +735,83 @@ Multiple #+ATTR_QUARTO: lines are supported and merged."
       (or "fig" "tbl" "lst" "eq" "sec"
           "thm" "lem" "cor" "prp" "cnj" "def" "exm" "exr" "sol" "rem" "alg"
           "tip" "nte" "wrn" "imp" "cau")
-      "-")
-  "Regexp matching Quarto cross-reference ID prefixes.")
+      (any "-:"))
+  "Regexp matching Quarto cross-reference ID prefixes.
+Both the Quarto form (`fig-x') and the Org-style form (`fig:x') match.")
+
+(defun org-quarto--xref-label (name)
+  "Return NAME as a Quarto cross-reference label.
+A leading `PREFIX:' with a known Quarto prefix (see
+`org-quarto--xref-prefix-regexp') becomes `PREFIX-', so `fig:elephant'
+becomes `fig-elephant'.  Other names are returned unchanged."
+  (if (and name (string-match org-quarto--xref-prefix-regexp name))
+      (concat (substring name 0 (1- (match-end 0)))
+              "-"
+              (substring name (match-end 0)))
+    name))
+
+(defun org-quarto--attr-value (val)
+  "Format VAL for a Pandoc attribute block, quoting only when needed.
+Surrounding double quotes, kept by `org-export-read-attribute', are
+stripped first."
+  (let ((v (if (stringp val) val (format "%s" val))))
+    (when (string-match "\\`\"\\(.*\\)\"\\'" v)
+      (setq v (match-string 1 v)))
+    (if (string-match-p "[ \t\n\"}]" v)
+        (format "\"%s\"" (replace-regexp-in-string "\"" "\\\\\"" v))
+      v)))
+
+(defun org-quarto--standalone-image-p (link paragraph)
+  "Non-nil when LINK is the only non-blank content of PARAGRAPH."
+  (and (eq (org-element-type paragraph) 'paragraph)
+       (cl-every (lambda (child)
+                   (or (eq child link)
+                       (and (stringp child)
+                            (not (org-string-nw-p child)))))
+                 (org-element-contents paragraph))))
+
+(defun org-quarto--image (link info)
+  "Transcode inline image LINK to a Quarto image.
+When LINK stands alone in its paragraph, the paragraph's #+CAPTION
+becomes the image caption, #+NAME (or :label in #+ATTR_QUARTO:) the
+cross-reference id, and remaining #+ATTR_QUARTO: pairs become
+attributes, e.g. `![Cap](img.png){#fig-x width=3in}'.  :class adds
+classes.  INFO is a plist used as a communication channel."
+  (let* ((type (org-element-property :type link))
+         (raw-path (org-element-property :path link))
+         (path (cond ((not (string= type "file")) (concat type ":" raw-path))
+                     ((file-name-absolute-p raw-path) (expand-file-name raw-path))
+                     (t raw-path)))
+         (paragraph (org-element-parent-element link)))
+    (if (not (org-quarto--standalone-image-p link paragraph))
+        (format "![](%s)" path)
+      (let* ((attr (org-export-read-attribute :attr_quarto paragraph))
+             (label (org-quarto--xref-label
+                     (or (org-element-property :name paragraph)
+                         (let ((l (plist-get attr :label)))
+                           (when l (if (stringp l) l (format "%s" l)))))))
+             (caption (when-let* ((c (org-export-get-caption paragraph)))
+                        (org-export-data c info)))
+             (parts '()))
+        (when label (push (concat "#" label) parts))
+        (when-let* ((cls (plist-get attr :class)))
+          (dolist (c (split-string (format "%s" cls) "[ \t\"]+" t))
+            (push (concat "." c) parts)))
+        (let ((plist attr))
+          (while plist
+            (let ((key (pop plist))
+                  (val (pop plist)))
+              (unless (memq key '(:label :class))
+                (push (format "%s=%s" (substring (symbol-name key) 1)
+                              (org-quarto--attr-value val))
+                      parts)))))
+        (concat (format "![%s](%s)" (or caption "") path)
+                (when parts
+                  (concat "{" (mapconcat #'identity (nreverse parts) " ") "}")))))))
 
 (defun org-quarto-link (link desc info)
   "Transcode LINK and DESC to Quarto format.
-Handles org-ref citations and Quarto cross-references; falls back to
+Handles org-ref citations, Quarto cross-references and images; falls back to
 `org-md-link' for all other link types.  INFO is a plist used as a
 communication channel."
   (let ((type (org-element-property :type link))
@@ -755,7 +827,9 @@ communication channel."
                 "]")))
      ((and (string= type "fuzzy")
            (string-match-p org-quarto--xref-prefix-regexp path))
-      (concat "@" path))
+      (concat "@" (org-quarto--xref-label path)))
+     ((org-export-inline-image-p link org-html-inline-image-rules)
+      (org-quarto--image link info))
      (t
       (org-md-link link desc info)))))
 
