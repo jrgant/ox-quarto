@@ -354,7 +354,7 @@ Later previews reuse the same xwidget buffer.
 
 Over time I will try to add tests to the repository. Until then, I am doing ad hoc tests on:
 
-- Kubuntu 26.04
-- emacs 30.2 (doom 3.0.0-pre)
+- Kubuntu 26.04.1
+- emacs 31.1 (doom 2.2.4)
 
 Please report issues on Windows or Mac, or in other emacs configs.
